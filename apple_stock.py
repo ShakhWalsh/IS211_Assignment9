@@ -1,33 +1,37 @@
 # apple_stock.py
-# URL: https://finance.yahoo.com/quote/AAPL/history?p=AAPL
+import yfinance as yf
+import pandas as pd
 
-import requests
-from bs4 import BeautifulSoup
+# Define the stock ticker symbol
+ticker_symbol = "AAPL"
 
-# Define URL to scrape
-url = "https://finance.yahoo.com/quote/AAPL/history?p=AAPL"
+# Get the historical stock data
+apple_data = yf.download(ticker_symbol, period="1mo", interval="1d")
 
-# Get the HTML content
-response = requests.get(url)
-soup = BeautifulSoup(response.content, "html.parser")
+# Check if data is valid
+if apple_data.empty or "Close" not in apple_data.columns:
+    print("No data found or 'Close' column missing. Check the ticker symbol or parameters.")
+    exit()
 
-# Locate the historical prices table
-table = soup.find("table", {"class": "W(100%) M(0)"})
+# Flatten the column names to handle MultiIndex
+if isinstance(apple_data.columns, pd.MultiIndex):
+    apple_data.columns = ["_".join(col).strip() for col in apple_data.columns.values]
 
-# Extract data from the table
-if table:
-    rows = table.find_all("tr")[1:]  # Skip header row
+# Reset the index to make 'Date' a column
+apple_data.reset_index(inplace=True)
 
-    # Print header
-    print(f"{'Date':<15} {'Close Price':<10}")
-    print("-" * 30)
+# Print header for clarity
+print(f"{'Date':<15} {'Close Price':<10}")
+print("-" * 30)
 
-    # Loop through rows and extract data
-    for row in rows:
-        cols = row.find_all("td")
-        if len(cols) > 5:  # Skip rows without valid data
-            date = cols[0].text.strip()
-            close_price = cols[4].text.strip()
-            print(f"{date:<15} {close_price:<10}")
-else:
-    print("Table not found!")
+# Corrected column name for Close price
+close_col_name = "Close_AAPL"  # Since the column name is flattened
+
+# Loop through the rows and print date and close price
+for _, row in apple_data.iterrows():
+    date = row["Date"]
+    close_price = row[close_col_name]
+
+    # Handle Series or NaN values correctly
+    if isinstance(date, pd.Timestamp) and pd.notnull(close_price):
+        print(f"{date.strftime('%Y-%m-%d'):<15} {float(close_price):<10.2f}")
